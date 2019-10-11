@@ -1,0 +1,6 @@
+[submodule "jackson"]
+	path = jackson
+	url = https://github.com/guangqianpeng/jackson
+[submodule "Cyclone"]
+	path = Cyclone
+	url = https://github.com/RaKiRaKiRa/Cyclone
