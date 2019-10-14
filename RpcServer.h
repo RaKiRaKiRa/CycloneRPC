@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-11 20:47
- * Last modified : 2019-10-12 16:39
+ * Last modified : 2019-10-14 18:46
  * Filename      : RpcServer.h
  * Description   : 
  **********************************************************/
@@ -19,6 +19,8 @@ class RpcService;
 class RpcServer:noncopyable
 {
 public:
+    typedef std::unique_ptr<RpcService> RpcServeicPtr;
+    typedef std::unordered_map<std::string, RpcServeicPtr> ServiceMap;
     RpcServer(EventLoop* loop, const sockaddr_in&  listen, std::string name = "RpcServer", bool ReusePort = true);
 
     ~RpcServer();
@@ -39,10 +41,10 @@ private:
     // 批量调用
     void handleBatchRequests(const ConnectionPtr &conn, const json::Value& request);
 
-    
-
+    bool checkReqest(const json::Value& request);
     void handleSingleRequest(const ConnectionPtr &conn, const json::Value& request);
 
+    bool checkNotify(const json::Value& request);
     void handleSingleNotify(const ConnectionPtr &conn, const json::Value& request);
 
     void onWriteComplete(const ConnectionPtr& conn);
@@ -51,12 +53,14 @@ private:
 
     // 错误处理
     void handleError(const ConnectionPtr& conn, JSON_RPC_ERROR err, int32_t id , std::string data = "");
+    // 用于回调
+    void onRpcResponse(const ConnectionPtr& conn, json::Value& response);
 
     bool isNotify(const json::Value& request)
     {
         return request.findMember("id") == request.memberEnd();
     }
-
+    ServiceMap serviceMap_;
     Server server_;
 
     //RpcDoneCallback rpcDoneCallback_;

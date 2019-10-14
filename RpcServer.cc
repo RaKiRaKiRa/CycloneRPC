@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-11 20:07
- * Last modified : 2019-10-12 16:45
+ * Last modified : 2019-10-14 18:58
  * Filename      : RpcServer.cc
  * Description   : 
  **********************************************************/
@@ -12,6 +12,9 @@
 #include "jackson/jackson/Document.h"
 #include "jackson/jackson/StringWriteStream.h"
 #include "Cyclone/net/base/Logging.h"
+#include "RpcService.h"
+#include "common.h"
+
 void RpcServer::onMessage(const ConnectionPtr &conn, Buffer* buf)
 {
     while(buf->readableBytes() >= Buffer::kHeaderLen)
@@ -66,12 +69,14 @@ void RpcServer::handleRequest(const ConnectionPtr &conn, const std::string& json
     */
     switch(request.getType())
     {
+        // 非批量调用
         case json::TYPE_OBJECT:
             if(isNotify(request))
                 handleSingleNotify(conn, request);
             else
                 handleSingleRequest(conn, request);
             break;
+        // 批量调用
         case json::TYPE_ARRAY:
             handleBatchRequests(conn, request);
             break;
@@ -79,6 +84,85 @@ void RpcServer::handleRequest(const ConnectionPtr &conn, const std::string& json
             handleError(conn, INVALID_REQUEST, 0, "request should be json object or array");    
     }
 }
+
+void RpcServer::handleBatchRequests(const ConnectionPtr& conn, const json::Value& requests)
+{
+    size_t n = requests.getSize();
+    if(0 == n)
+    {
+        handleError(conn, INVALID_REQUEST, 0, "batch request is empty");
+        return;
+    }
+    // 对每个请求调用
+    for(int i = 0; i < n; ++i)
+    {
+        json::Value request = requests[i];
+        if(!request.isObject())
+        {
+            handleError(conn, INVALID_REQUEST, 0, "request should be json object");
+            continue;
+        }
+        if(isNotify(request))
+            handleSingleNotify(conn, request);
+        else
+            handleSingleRequest(conn, request);
+    }
+}
+
+void RpcServer::handleSingleRequest(const ConnectionPtr& conn, const json::Value& request)
+{
+    if(!checkReqest(request))
+        return;
+    //"Arithmetic.Add"
+    // 调用格式 service.method
+    int id = request["id"].getInt32();
+    std::string method(request["method"].getString());
+    size_t pos = method.find('.');
+    if(pos == method.npos)
+    {
+        handleError(conn, METHOD_NOT_FOUND, id);
+        return;
+    }
+    // 寻找service
+    std::string service = method.substr(0, pos);
+    ServiceMap::iterator it = serviceMap_.find(service);
+    if(it == serviceMap_.end())
+    {
+        handleError(conn, METHOD_NOT_FOUND, id);
+        return;
+    }
+    method.erase(method.begin() + pos, method.end());
+    // TODO 调用对应service
+    it->second->callProcedureRequest(method, request, std::bind(&RpcServer::onRpcResponse,this , conn, _1));
+}
+
+void RpcServer::handleSingleNotify(const ConnectionPtr& conn, const json::Value& request)
+{
+    if(!checkNotify(request))
+        return;
+    //"Arithmetic.Add"
+    // 调用格式 service.method
+    int id = request["id"].getInt32();
+    std::string method(request["method"].getString());
+    size_t pos = method.find('.');
+    if(pos == method.npos)
+    {
+        handleError(conn, METHOD_NOT_FOUND, id);
+        return;
+    }
+    // 寻找service
+    std::string service = method.substr(0, pos);
+    ServiceMap::iterator it = serviceMap_.find(service);
+    if(it == serviceMap_.end())
+    {
+        handleError(conn, METHOD_NOT_FOUND, id);
+        return;
+    }
+    method.erase(method.begin() + pos, method.end());
+    // TODO 调用对应service
+    it->second->callProcedureNotify(method, request);
+}
+
 
 void RpcServer::handleError(const ConnectionPtr& conn, JSON_RPC_ERROR err, int32_t id, std::string data)
 {
@@ -92,7 +176,7 @@ void RpcServer::handleError(const ConnectionPtr& conn, JSON_RPC_ERROR err, int32
         error.addMember("data", data);
     response.addMember("error", error);
     response.addMember("id", id);
-    // 响应报文构造完成，发送报文
+    // 响应报文构造完成，发送错误报文
     LOG_WARN << "RpcServer::handleRequest() " << toIpPort(conn->peer()) << "request : " << Singleton<RpcError>::Instance().errorMessage(err);
     sendResponse(conn, response);
     conn->shutdown();
@@ -112,4 +196,17 @@ void RpcServer::sendResponse(const ConnectionPtr &conn, json::Value &response)
     message.setHeader(os.get().length());
     conn->send(&message);
 }
+
+ void RpcServer::onRpcResponse(const ConnectionPtr& conn, json::Value& response)
+ {
+     if(!response.isNull())
+     {
+         sendResponse(conn, response);
+         LOG_TRACE << "onRpcResponse: ->" << toIpPort(conn->peer()) <<" request success";
+     }
+     else
+     {
+         LOG_TRACE << "onRpcResponse: ->" << toIpPort(conn->peer()) <<" ontify success";
+     }
+ }
 
