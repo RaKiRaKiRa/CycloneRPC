@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-11 20:07
- * Last modified : 2019-10-14 18:58
+ * Last modified : 2019-10-18 16:12
  * Filename      : RpcServer.cc
  * Description   : 
  **********************************************************/
@@ -12,8 +12,42 @@
 #include "jackson/jackson/Document.h"
 #include "jackson/jackson/StringWriteStream.h"
 #include "Cyclone/net/base/Logging.h"
+#include "Cyclone/net/Server.h"
 #include "RpcService.h"
 #include "common.h"
+#include <memory>
+
+
+RpcServer::RpcServer(EventLoop* loop, const sockaddr_in&  listen, std::string name, bool ReusePort):
+    server_(loop, listen, name, ReusePort),
+    serviceMap_()
+{
+    server_.setMessCallback(std::bind(&RpcServer::onMessage, this, _1, _2));
+    server_.setConnCallback(std::bind(&RpcServer::onConnection, this, _1));
+    LOG_INFO << "RpcServer::RpcServer " << name;
+}
+
+
+
+
+void RpcServer::addService(const std::string& serviceName, RpcService* service)
+{
+    LOG_INFO << "RpcServer::addService : " << serviceName; 
+    serviceMap_.emplace(serviceName, service);
+}
+
+void RpcServer::onConnection(const ConnectionPtr &conn)
+{
+    if(conn->connected())
+    {
+        LOG_TRACE << "connection " << toIpPort(conn->peer()) << " is UP";
+    }
+    else
+    {
+        LOG_TRACE << "connection " << toIpPort(conn->peer()) << " is DOWN";
+    }
+    
+}
 
 void RpcServer::onMessage(const ConnectionPtr &conn, Buffer* buf)
 {
@@ -133,7 +167,7 @@ void RpcServer::handleSingleRequest(const ConnectionPtr& conn, const json::Value
     }
     method.erase(method.begin() + pos, method.end());
     // TODO 调用对应service
-    it->second->callProcedureRequest(method, request, std::bind(&RpcServer::onRpcResponse,this , conn, _1));
+    it->second->callProcedureRequest(method, request, std::bind(&RpcServer::onRpcResponse, this , conn, _1));
 }
 
 void RpcServer::handleSingleNotify(const ConnectionPtr& conn, const json::Value& request)
@@ -184,7 +218,7 @@ void RpcServer::handleError(const ConnectionPtr& conn, JSON_RPC_ERROR err, int32
 }
 
 
-void RpcServer::sendResponse(const ConnectionPtr &conn, json::Value &response)
+void RpcServer::sendResponse(const ConnectionPtr &conn, const json::Value &response)
 {
     json::StringWriteStream os;
     json::Writer writer(os);
@@ -197,16 +231,17 @@ void RpcServer::sendResponse(const ConnectionPtr &conn, json::Value &response)
     conn->send(&message);
 }
 
- void RpcServer::onRpcResponse(const ConnectionPtr& conn, json::Value& response)
- {
-     if(!response.isNull())
-     {
-         sendResponse(conn, response);
-         LOG_TRACE << "onRpcResponse: ->" << toIpPort(conn->peer()) <<" request success";
-     }
-     else
-     {
-         LOG_TRACE << "onRpcResponse: ->" << toIpPort(conn->peer()) <<" ontify success";
-     }
- }
+
+void RpcServer::onRpcResponse(const ConnectionPtr& conn, const json::Value& response)
+{
+    if(!response.isNull())
+    {
+        sendResponse(conn, response);
+        LOG_TRACE << "onRpcResponse: ->" << toIpPort(conn->peer()) <<" request success";
+    }
+    else
+    {
+        LOG_TRACE << "onRpcResponse: ->" << toIpPort(conn->peer()) <<" ontify success";
+    }
+}
 
