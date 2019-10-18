@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-14 18:27
- * Last modified : 2019-10-18 16:55
+ * Last modified : 2019-10-18 21:11
  * Filename      : RpcService.h
  * Description   : 
  **********************************************************/
@@ -28,6 +28,7 @@ public:
     // 会在stubClass的[stubProcedureBindings]生成的代码中生成，在stubClass的构造函数中调用，将Procedure加入对应Service
     void addProcedureRequest(std::string methodName, ProcedureNofity* procedure);
     void addProcedureNotify(std::string methodName, ProcedureNofity* procedure);
+    
     // RpcServer::handleSingleRequest中调用
     void callProcedureRequest(const std::string &method, const json::Value& request, const RpcDoneCallback& done);
     // RpcServer::handleSingleNotify中调用
