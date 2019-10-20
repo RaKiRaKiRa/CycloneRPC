@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-12 15:33
- * Last modified : 2019-10-12 16:31
+ * Last modified : 2019-10-20 00:12
  * Filename      : RpcError.h
  * Description   : 
  **********************************************************/
@@ -15,6 +15,7 @@
 
 enum JSON_RPC_ERROR
 {
+    NONE             = 0,
     PRASE_ERROR      = -32700,
     INVALID_REQUEST  = -32600,
     METHOD_NOT_FOUND = -32601,
