@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-11 20:47
- * Last modified : 2019-10-18 16:48
+ * Last modified : 2019-10-20 15:58
  * Filename      : RpcServer.h
  * Description   : 
  **********************************************************/
@@ -42,10 +42,10 @@ private:
     // 批量调用
     void handleBatchRequests(const ConnectionPtr &conn, const json::Value& request);
 
-    bool checkReqest(const json::Value& request);
+    bool checkReqest(const ConnectionPtr& conn, const json::Value& request);
     void handleSingleRequest(const ConnectionPtr &conn, const json::Value& request);
 
-    bool checkNotify(const json::Value& request);
+    bool checkNotify(const ConnectionPtr& conn, const json::Value& request);
     void handleSingleNotify(const ConnectionPtr &conn, const json::Value& request);
 
     void onWriteComplete(const ConnectionPtr& conn);
@@ -61,9 +61,9 @@ private:
     {
         return request.findMember("id") == request.memberEnd();
     }
+
     ServiceMap serviceMap_;
     Server server_;
-
     //RpcDoneCallback rpcDoneCallback_;
 
 };

@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-11 20:07
- * Last modified : 2019-10-18 16:12
+ * Last modified : 2019-10-20 20:24
  * Filename      : RpcServer.cc
  * Description   : 
  **********************************************************/
@@ -27,9 +27,6 @@ RpcServer::RpcServer(EventLoop* loop, const sockaddr_in&  listen, std::string na
     LOG_INFO << "RpcServer::RpcServer " << name;
 }
 
-
-
-
 void RpcServer::addService(const std::string& serviceName, RpcService* service)
 {
     LOG_INFO << "RpcServer::addService : " << serviceName; 
@@ -46,7 +43,6 @@ void RpcServer::onConnection(const ConnectionPtr &conn)
     {
         LOG_TRACE << "connection " << toIpPort(conn->peer()) << " is DOWN";
     }
-    
 }
 
 void RpcServer::onMessage(const ConnectionPtr &conn, Buffer* buf)
@@ -143,36 +139,78 @@ void RpcServer::handleBatchRequests(const ConnectionPtr& conn, const json::Value
     }
 }
 
-void RpcServer::handleSingleRequest(const ConnectionPtr& conn, const json::Value& request)
+template <json::ValueType type, json::ValueType... types>
+bool checkType(json::ValueType t)
 {
-    if(!checkReqest(request))
-        return;
-    //"Arithmetic.Add"
-    // 调用格式 service.method
-    int id = request["id"].getInt32();
-    std::string method(request["method"].getString());
-    size_t pos = method.find('.');
-    if(pos == method.npos)
+    if(t == type)
     {
-        handleError(conn, METHOD_NOT_FOUND, id);
-        return;
+        return true;
     }
-    // 寻找service
-    std::string service = method.substr(0, pos);
-    ServiceMap::iterator it = serviceMap_.find(service);
-    if(it == serviceMap_.end())
+    if(sizeof...(types) > 0)
     {
-        handleError(conn, METHOD_NOT_FOUND, id);
-        return;
+        return checkType<types...>(t);
     }
-    method.erase(method.begin() + pos, method.end());
-    // TODO 调用对应service
-    it->second->callProcedureRequest(method, request, std::bind(&RpcServer::onRpcResponse, this , conn, _1));
+     return false;   
 }
 
-void RpcServer::handleSingleNotify(const ConnectionPtr& conn, const json::Value& request)
+template <json::ValueType type>
+bool checkType(json::ValueType t)
 {
-    if(!checkNotify(request))
+    return t == type;
+}
+
+template<json::ValueType... types>
+bool findValue(const json::Value &request, const char* key, json::Value &value)
+{
+    json::Value::MemberIterator it = request.findMember(key);
+    if(it == request.memberEnd())
+    {
+        return false;
+    }
+    if(checkType<types...>(it->value.getType()))
+    {
+        value = it->value;
+        return true;
+    }
+    return false;
+}
+
+bool RpcServer::checkReqest(const ConnectionPtr& conn, const json::Value& request)
+{
+    json::Value id;
+    if(!findValue<json::TYPE_INT32, json::TYPE_INT64, json::TYPE_NULL, json::TYPE_STRING>(request, "id", id))
+    {
+        handleError(conn, INVALID_REQUEST, 0);
+        return false;
+    }
+
+    json::Value version;
+    if(!findValue<json::TYPE_STRING>(request, "jsonrpc", version) || version.getString() != "2.0")
+    {
+        handleError(conn, INVALID_REQUEST, id.getInt32());
+        return false;
+    }
+
+    json::Value method;
+    if(!findValue<json::TYPE_STRING>(request, "method", method))
+    {
+        handleError(conn, METHOD_NOT_FOUND, id.getInt32());
+        return false;
+    }
+
+    // jsonrpc, method, params, id
+    if(request.getSize() != (3 + (request.findMember("params") != request.memberEnd())))
+    {
+        handleError(conn, INVALID_REQUEST, id.getInt32());
+        return false;
+    }
+    return true;
+}
+
+
+void RpcServer::handleSingleRequest(const ConnectionPtr& conn, const json::Value& request)
+{
+    if(!checkReqest(conn, request))
         return;
     //"Arithmetic.Add"
     // 调用格式 service.method
@@ -181,7 +219,7 @@ void RpcServer::handleSingleNotify(const ConnectionPtr& conn, const json::Value&
     size_t pos = method.find('.');
     if(pos == method.npos)
     {
-        handleError(conn, METHOD_NOT_FOUND, id);
+        handleError(conn, INVALID_REQUEST, id);
         return;
     }
     // 寻找service
@@ -192,9 +230,76 @@ void RpcServer::handleSingleNotify(const ConnectionPtr& conn, const json::Value&
         handleError(conn, METHOD_NOT_FOUND, id);
         return;
     }
-    method.erase(method.begin() + pos, method.end());
+    method.erase(0, pos + 1);
     // TODO 调用对应service
-    it->second->callProcedureNotify(method, request);
+    JSON_RPC_ERROR err = NONE;
+    it->second->callProcedureRequest(method, request, std::bind(&RpcServer::onRpcResponse, this , conn, _1), err);
+    if(err != NONE)
+    {
+        handleError(conn, err, id);
+    }
+}
+
+
+bool RpcServer::checkNotify(const ConnectionPtr& conn, const json::Value& request)
+{
+    json::Value version;
+    if(!findValue<json::TYPE_STRING>(request, "jsonrpc", version) || version.getString() != "2.0")
+    {
+        LOG_WARN << "RpcServer::handleSingleNotify() " << toIpPort(conn->peer()) << "Notify Error : " << "INVALID_REQUEST";
+        return false;
+    }
+
+    json::Value method;
+    if(!findValue<json::TYPE_STRING>(request, "method", method))
+    {
+        LOG_WARN << "RpcServer::handleSingleNotify() " << toIpPort(conn->peer()) << "Notify Error : " << "METHOD_NOT_FOUND";
+        return false;
+    }
+
+    // jsonrpc, method, params
+    if(request.getSize() != (2 + (request.findMember("params") != request.memberEnd())))
+    {
+        LOG_WARN << "RpcServer::handleSingleNotify() " << toIpPort(conn->peer()) << "Notify Error : " << "INVALID_REQUEST";
+        return false;
+    }
+    return true;
+}
+
+// 通知错误并不会报错嗷
+void RpcServer::handleSingleNotify(const ConnectionPtr& conn, const json::Value& request)
+{
+    if(!checkNotify(conn, request))
+        return;
+    //"Arithmetic.Add"
+    // 调用格式 service.method
+    
+    std::string method(request["method"].getString());
+    size_t pos = method.find('.');
+    if(pos == method.npos)
+    {
+        LOG_WARN << "RpcServer::handleSingleNotify() " << toIpPort(conn->peer()) << "Notify Error : " << "INVALID_REQUEST";
+        //handleError(conn, METHOD_NOT_FOUND, 0);
+        return;
+    }
+    // 寻找service
+    std::string service = method.substr(0, pos);
+    ServiceMap::iterator it = serviceMap_.find(service);
+    if(it == serviceMap_.end())
+    {
+        LOG_WARN << "RpcServer::handleSingleNotify() " << toIpPort(conn->peer()) << "Notify Error : " << "METHOD_NOT_FOUND";
+        //handleError(conn, METHOD_NOT_FOUND, 0);
+        return;
+    }
+    method.erase(0, pos + 1);
+    // TODO 调用对应service
+    JSON_RPC_ERROR err = NONE;
+    it->second->callProcedureNotify(method, request, err);
+    if(err != NONE)
+    {
+        LOG_WARN << "RpcServer::handleSingleNotify() " << toIpPort(conn->peer()) << "Notify Error : " << Singleton<RpcError>::Instance().errorMessage(err);
+        //handleError(conn, err, 0);
+    }
 }
 
 
@@ -211,10 +316,9 @@ void RpcServer::handleError(const ConnectionPtr& conn, JSON_RPC_ERROR err, int32
     response.addMember("error", error);
     response.addMember("id", id);
     // 响应报文构造完成，发送错误报文
-    LOG_WARN << "RpcServer::handleRequest() " << toIpPort(conn->peer()) << "request : " << Singleton<RpcError>::Instance().errorMessage(err);
+    LOG_WARN << "RpcServer::handleRequest() " << toIpPort(conn->peer()) << "Request Error : " << Singleton<RpcError>::Instance().errorMessage(err);
     sendResponse(conn, response);
     conn->shutdown();
-    
 }
 
 
@@ -241,7 +345,7 @@ void RpcServer::onRpcResponse(const ConnectionPtr& conn, const json::Value& resp
     }
     else
     {
-        LOG_TRACE << "onRpcResponse: ->" << toIpPort(conn->peer()) <<" ontify success";
+        LOG_TRACE << "onRpcResponse: ->" << toIpPort(conn->peer()) <<" notify success";
     }
 }
 
