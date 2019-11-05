@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-14 18:27
- * Last modified : 2019-10-20 16:51
+ * Last modified : 2019-10-28 16:52
  * Filename      : RpcService.h
  * Description   : 
  **********************************************************/
@@ -17,7 +17,6 @@
 #include "ProcedureRequest.h"
 
 class RpcServer;
-template<typename ProcedureType> class Procedure;
 
 // 会在stubClass的构造函数中构造，然后被加入RpcServer的ServiceMap进行管理，每个Service中含有多个Procedure
 class RpcService:noncopyable
