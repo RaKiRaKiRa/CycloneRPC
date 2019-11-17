@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-14 18:36
- * Last modified : 2019-10-28 20:34
+ * Last modified : 2019-11-16 01:22
  * Filename      : common.h
  * Description   : 
  **********************************************************/
@@ -31,7 +31,7 @@ typedef std::function<void(const json::Value&)> ProcedureNotifyCallback;
 class UserDoneCallback
 {
 public:
-    UserDoneCallback(json::Value &request, const RpcDoneCallback &cb):
+    UserDoneCallback(const json::Value &request, const RpcDoneCallback &cb):
         request_(request),
         callback_(cb)
     {}

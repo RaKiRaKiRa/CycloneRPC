@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-11 20:47
- * Last modified : 2019-10-20 15:58
+ * Last modified : 2019-11-16 00:31
  * Filename      : RpcServer.h
  * Description   : 
  **********************************************************/
@@ -33,8 +33,6 @@ private:
 
     // 接收信息先检查包头，确认接收完毕后,取出信息，调用handldRequest
     void onMessage(const ConnectionPtr& conn, Buffer* buf);
-
-    void onConnection(const ConnectionPtr& conn);
     
     // 转为json，再判断时批量调用还是ReturnProduce还是NotifyProduce
     void handleRequest(const ConnectionPtr &conn, const std::string& json);

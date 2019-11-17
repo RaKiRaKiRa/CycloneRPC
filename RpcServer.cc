@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-11 20:07
- * Last modified : 2019-10-20 20:24
+ * Last modified : 2019-11-16 01:16
  * Filename      : RpcServer.cc
  * Description   : 
  **********************************************************/
@@ -140,29 +140,32 @@ void RpcServer::handleBatchRequests(const ConnectionPtr& conn, const json::Value
 }
 
 template <json::ValueType type, json::ValueType... types>
-bool checkType(json::ValueType t)
+bool checkType(const json::ValueType t)
 {
     if(t == type)
     {
         return true;
     }
-    if(sizeof...(types) > 0)
+    if constexpr (sizeof...(types) > 0)
     {
         return checkType<types...>(t);
     }
-     return false;   
+    return false;   
 }
 
+//FIXME: 
+/*
 template <json::ValueType type>
 bool checkType(json::ValueType t)
 {
     return t == type;
-}
+}*/
 
+// 判断types里有没有request的类型
 template<json::ValueType... types>
 bool findValue(const json::Value &request, const char* key, json::Value &value)
 {
-    json::Value::MemberIterator it = request.findMember(key);
+    json::Value::ConstMemberIterator it = request.findMember(key);
     if(it == request.memberEnd())
     {
         return false;
@@ -329,7 +332,7 @@ void RpcServer::sendResponse(const ConnectionPtr &conn, const json::Value &respo
     response.writeTo(writer);
     
     Buffer message;
-    message.append(os.get());
+    message.append(std::string(os.get()));
     // 加入包头防止粘包
     message.setHeader(os.get().length());
     conn->send(&message);

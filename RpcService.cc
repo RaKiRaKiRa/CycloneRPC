@@ -2,14 +2,14 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-20 16:45
- * Last modified : 2019-10-20 16:53
+ * Last modified : 2019-11-16 01:28
  * Filename      : RpcService.cc
  * Description   : 
  **********************************************************/
 
 #include "RpcService.h"
 
-void RpcService::addProcedureRequest(std::string methodName, ProcedureNotify* procedure)
+void RpcService::addProcedureRequest(std::string methodName, ProcedureRequest* procedure)
 {
     assert(procedureRequestMap_.find(methodName) == procedureRequestMap_.end());
     procedureRequestMap_.emplace(methodName, procedure);

@@ -2,13 +2,12 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-20 12:27
- * Last modified : 2019-10-20 20:19
+ * Last modified : 2019-11-16 01:20
  * Filename      : ProcedureNotify.h
  * Description   : 
  **********************************************************/
 #ifndef CYCLONERPC_PROCEDURENOTIFY_H
 #define CYCLONERPC_PROCEDURENOTIFY_H
-#include "Procedure.h"
 #include "common.h"
 #include "RpcError.h"
 
@@ -20,9 +19,9 @@ public:
     explicit ProcedureNotify(ProcedureNotifyCallback cb, ParamNameAndParamType&&... nameAndTypes):
         notifyCallback_(std::move(cb))
     {
-        int n = sizeof...(nameAndTypes);
+        const int n = sizeof...(nameAndTypes);
         // nameAndTypes必有偶数个，一个name，一个type
-        static_assert(n % 2 == 0);
+        static_assert(n % 2 == 0, "n % 2 != 0");
         // 递归展开存入params_
         if(n > 0)
             initProcedure(nameAndTypes...);
@@ -73,7 +72,7 @@ private:
 
     struct Param
     {
-        Param(std::string &name, json::ValueType &type):
+        Param(const std::string &name, const json::ValueType &type):
             paramName(name),
             paramType(type)
         {}
