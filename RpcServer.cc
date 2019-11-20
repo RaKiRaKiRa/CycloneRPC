@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-10-11 20:07
- * Last modified : 2019-11-16 01:16
+ * Last modified : 2019-11-20 18:34
  * Filename      : RpcServer.cc
  * Description   : 
  **********************************************************/
@@ -47,10 +47,19 @@ void RpcServer::onConnection(const ConnectionPtr &conn)
 
 void RpcServer::onMessage(const ConnectionPtr &conn, Buffer* buf)
 {
+    // 解析时先看包头
     while(buf->readableBytes() >= Buffer::kHeaderLen)
     {
-        const int32_t len = buf->readHeader();
-        if(buf->readableBytes() >= len + Buffer::kHeaderLen)
+        const int32_t len = buf->getHeader();
+        if(len <= 0)
+        {
+            LOG_ERROR << "Invalid Length "<<len;
+            handleError(conn, PRASE_ERROR, 0);
+            // 连接断开 全部丢弃
+            conn->shutdown();
+            break;
+        }
+        else if(buf->readableBytes() >= len + Buffer::kHeaderLen)
         {
             buf->retrieve(Buffer::kHeaderLen);
             std::string message(buf->peek(), len);
@@ -330,11 +339,12 @@ void RpcServer::sendResponse(const ConnectionPtr &conn, const json::Value &respo
     json::StringWriteStream os;
     json::Writer writer(os);
     response.writeTo(writer);
-    
+    // 发送时添加包头
     Buffer message;
-    message.append(std::string(os.get()));
+    std::string str(os.get());
+    message.append(str);
     // 加入包头防止粘包
-    message.setHeader(os.get().length());
+    message.setHeader(str.length());
     conn->send(&message);
 }
 
