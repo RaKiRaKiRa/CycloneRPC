@@ -2,7 +2,7 @@
  * Author        : RaKiRaKiRa
  * Email         : 763600693@qq.com
  * Create time   : 2019-11-16 01:33
- * Last modified : 2019-11-18 02:21
+ * Last modified : 2019-11-20 20:28
  * Filename      : RpcClient.h
  * Description   : 
  **********************************************************/
@@ -21,19 +21,19 @@ class RpcClient: noncopyable
 public:
     RpcClient(EventLoop* loop, sockaddr_in& serverAddr, const std::string& name = "RpcClient"):
         client_(loop, serverAddr),
-        id_(0)
+        id_(1)
     {
         client_.setMessCallback(std::bind(&RpcClient::onMessage, this, _1, _2));
     }
     RpcClient(EventLoop* loop, std::string ip, uint16_t port, const std::string& name = "RpcClient"):
         client_(loop, ip, port),
-        id_(0)
+        id_(1)
     {
         client_.setMessCallback(std::bind(&RpcClient::onMessage, this, _1, _2));
     }
     RpcClient(EventLoop* loop, uint16_t port, const std::string& name = "RpcClient"):
         client_(loop, port),
-        id_(0)
+        id_(1)
     {
         client_.setMessCallback(std::bind(&RpcClient::onMessage, this, _1, _2));
     }
@@ -49,26 +49,28 @@ public:
     }
 
     // 将相应请求转为json然后调用sendCall
-    // 收到返回值后调用cb->异步rpc =>需要一个表
+    // Request收到返回值后调用cb->异步rpc =>需要一个表
     void Call(const ConnectionPtr& conn, json::Value& call, const ResponseCallback& cb);
     
+    // Notify, 不需要id不需要回调，直接发送
     void Call(const ConnectionPtr& conn, json::Value& call);
 private:
-    // 解析回复一套
+    // 解析回复一条龙
     void onMessage(const ConnectionPtr& conn, Buffer* buffer);
-    void handleMessage(Buffer* buf);
-    void handleResponse(std::string& json);
-    void handleSingleResponse(json::Value& response);
+    //bool handleMessage(Buffer* buf);
+    void ParseResponse(std::string& json);
+    void ParseSingleResponse(json::Value& response);
+    bool checkResponse(json::Value& response);
     
     // 发送json
     void sendCall(const ConnectionPtr& conn, json::Value& request);
 
     CallbackMap callbackMap_;
     Client client_;
-    int64_t id_;
+    int32_t id_;
     std::string name_;
 };
 
 
 
-#endif  CYCLONE_RPCCLIENT_H
+#endif  //CYCLONE_RPCCLIENT_H
