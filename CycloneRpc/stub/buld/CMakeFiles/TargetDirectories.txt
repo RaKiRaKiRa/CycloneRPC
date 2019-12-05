@@ -1,3 +1,0 @@
-/home/raki/Desktop/CycloneRpc/stub/buld/CMakeFiles/edit_cache.dir
-/home/raki/Desktop/CycloneRpc/stub/buld/CMakeFiles/CycloneStub.dir
-/home/raki/Desktop/CycloneRpc/stub/buld/CMakeFiles/rebuild_cache.dir
