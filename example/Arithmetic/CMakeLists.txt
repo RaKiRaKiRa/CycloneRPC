@@ -1,0 +1,6 @@
+add_executable(arithmetic_server ArithmeticService.cc)
+target_link_libraries(arithmetic_server Cyclone_Rpc Cyclone_net)
+
+
+add_executable(arithmetic_client ArithmeticClient.cc)
+target_link_libraries(arithmetic_client Cyclone_Rpc Cyclone_net)
